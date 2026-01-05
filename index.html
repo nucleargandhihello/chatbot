@@ -1,11 +1,11 @@
-<!DOCTYPE html>
+   <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval'; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline'; style-src * 'unsafe-inline';">
     <title>       BRAIN</title>
-    
+
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -76,7 +76,7 @@
             border-left-color: #555;
             background: rgba(255,255,255,0.03);
         }
-        
+
         .brain-row { 
             border-left-color: #dc2626;
             background: rgba(220, 38, 38, 0.05);
@@ -96,11 +96,11 @@
             outline: none; 
             background: transparent;
         }
-        
+
         input:focus {
             border-color: #dc2626;
         }
-        
+
         .pulse-red {
             width: 8px; 
             height: 8px; 
@@ -110,7 +110,7 @@
             margin-right: 8px;
             animation: pulse 1.5s infinite;
         }
-        
+
         @keyframes pulse { 
             0% { opacity: 1; transform: scale(1); } 
             50% { opacity: 0.4; transform: scale(0.9); } 
@@ -176,217 +176,523 @@
 <body>
     <div id="root"></div>
 
-   <script type="text/babel">
-    const { useState, useEffect, useRef } = React;
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
 
-    // --- 1. ICONS ---
-    const Settings = () => (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v6"></path>
-        </svg>
-    );
-
-    const Download = () => (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line>
-        </svg>
-    );
-
-    const Trash = () => (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
-        </svg>
-    );
-
-    // --- 2. MESSAGE PROCESSOR ---
-    const MessageContent = ({ content, role }) => {
-        if (role === 'user') return <p>{content}</p>;
-
-        const phaseMatch = content.match(/\[PHASE 1: LOGIC SCRATCHPAD\]([\s\S]*?)\[PHASE 2: FINAL OUTPUT\]([\s\S]*)/);
-        
-        let displayBody = content;
-        let scratchpad = null;
-
-        if (phaseMatch) {
-            scratchpad = phaseMatch[1].trim();
-            displayBody = phaseMatch[2].trim();
-        }
-
-        return (
-            <div className="space-y-4">
-                {scratchpad && (
-                    <details className="mb-4 border border-red-900/30 bg-black/40 rounded">
-                        <summary className="cursor-pointer p-2 text-[10px] text-red-500/50 uppercase tracking-[0.2em] hover:text-red-500 transition-colors">
-                            ▼ VIEW_LOGIC_TRACE
-                        </summary>
-                        <div className="p-3 text-xs text-blue-400 italic font-mono border-t border-red-900/20 leading-relaxed whitespace-pre-wrap">
-                            {scratchpad}
-                        </div>
-                    </details>
-                )}
-                <div className="final-output">
-                    {displayBody.split('\n').map((line, idx) => {
-                        const isHeader = line.includes('THESIS:') || line.includes('ANTITHESIS:') || line.includes('SYNTHESIS:');
-                        return (
-                            <p key={idx} className={`${isHeader ? 'text-red-600 font-black mt-6 mb-2 tracking-tighter text-base' : 'mb-2 opacity-90'}`}>
-                                {line}
-                            </p>
-                        );
-                    })}
-                </div>
-            </div>
+        const Settings = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M12 1v6m0 6v6"></path>
+            </svg>
         );
-    };
 
-    // --- 3. MAIN APP ---
-    const App = () => {
-        const [messages, setMessages] = useState([]);
-        const [input, setInput] = useState('');
-        const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_key') || '');
-        const [isLocked, setIsLocked] = useState(!apiKey);
-        const [loading, setLoading] = useState(false);
-        const [activeModel, setActiveModel] = useState('Standby');
-        const [showSettings, setShowSettings] = useState(false);
-        const [strictMode, setStrictMode] = useState(true);
-        const [memory, setMemory] = useState({});
-        const [temperature, setTemperature] = useState(0.7);
-        const scrollRef = useRef(null);
+        const Download = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+        );
 
-        const modelSequence = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+        const Trash = () => (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path>
+            </svg>
+        );
 
-        useEffect(() => {
-            scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
-        }, [messages]);
+        const App = () => {
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState('');
+            const [apiKey, setApiKey] = useState(localStorage.getItem('gemini_key') || '');
+            const [isLocked, setIsLocked] = useState(!apiKey);
+            const [loading, setLoading] = useState(false);
+            const [activeModel, setActiveModel] = useState('Standby');
+            const [showSettings, setShowSettings] = useState(false);
+            const [strictMode, setStrictMode] = useState(true);
+            const [memory, setMemory] = useState({});
+            const [temperature, setTemperature] = useState(0.7);
+            const scrollRef = useRef(null);
 
-        useEffect(() => {
-            const storedMem = localStorage.getItem('brain_memory');
-            if (storedMem) setMemory(JSON.parse(storedMem));
-            const storedMsgs = localStorage.getItem('brain_messages');
-            if (storedMsgs) setMessages(JSON.parse(storedMsgs));
-        }, []);
+            const modelSequence = [
+                'gemini-2.5-flash',
+                'gemini-2.0-flash',
+                'gemini-flash-latest',
+                'gemini-pro-latest',
+                'gemini-2.5-pro',
+                'gemini-pro'
+            ];
 
-        useEffect(() => {
-            if (messages.length > 0) localStorage.setItem('brain_messages', JSON.stringify(messages));
-        }, [messages]);
+            useEffect(() => {
+                scrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, [messages]);
 
-        const buildSystemPrompt = () => `
-            You are ENGINE.V2, a rigorous logic system. 
-            Protocol: 
-            1. Use [PHASE 1: LOGIC SCRATCHPAD] for deconstruction.
-            2. Use [PHASE 2: FINAL OUTPUT] for the Dialectic (THESIS, ANTITHESIS, SYNTHESIS).
-            Current Memory: ${JSON.stringify(memory)}
-            Strict Mode: ${strictMode}
-        `;
+            useEffect(() => {
+                const stored = localStorage.getItem('brain_memory');
+                if (stored) setMemory(JSON.parse(stored));
+                const storedMsgs = localStorage.getItem('brain_messages');
+                if (storedMsgs) setMessages(JSON.parse(storedMsgs));
+            }, []);
 
-        const runAutoInference = async () => {
-            if (!input.trim() || loading) return;
-            const userText = input;
-            const sys = buildSystemPrompt();
-            
-            setInput('');
-            setMessages(prev => [...prev, { role: 'user', content: userText }]);
-            setLoading(true);
+            useEffect(() => {
+                if (messages.length > 0) {
+                    localStorage.setItem('brain_messages', JSON.stringify(messages));
+                }
+            }, [messages]);
 
-            let success = false;
-            for (const modelId of modelSequence) {
-                setActiveModel(`INF: ${modelId}`);
-                try {
-                    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            system_instruction: { parts: [{ text: sys }] },
-                            contents: [{ parts: [{ text: `Analyze request: ${userText}` }] }],
-                            generationConfig: { temperature, topP: 0.95 }
-                        })
-                    });
-                    const data = await res.json();
-                    if (res.ok && data.candidates?.[0]?.content?.parts?.[0]) {
-                        const reply = data.candidates[0].content.parts[0].text;
-                        setMessages(prev => [...prev, { role: 'brain', content: reply, model: modelId }]);
-                        success = true;
-                        break;
-                    }
-                } catch (e) { console.error(e); }
+            const saveMemory = (newMemory) => {
+                setMemory(newMemory);
+                localStorage.setItem('brain_memory', JSON.stringify(newMemory));
+            };
+
+            const buildSystemPrompt = () => {
+                return `You are a strict reasoning assistant with these principles:
+
+1. EPISTEMIC HUMILITY: Say "unknown" when uncertain. Never fabricate.
+2. STEP-BY-STEP LOGIC: Decompose arguments into premises and conclusions.
+3. NO FLUFF: No motivational language or corporate jargon.
+4. CLASSICAL FOUNDATION: Reference Aristotle, Newton, Kant, Greek philosophy when relevant.
+const specializedPrompt = `
+[DIALECTIC PROTOCOL ACTIVATED]
+1. THESIS: Define the core proposition of "${userText}".
+2. ANTITHESIS: Identify the strongest counter-argument or potential logical fallacy.
+3. SYNTHESIS: Provide the most rigorous, fluff-free conclusion.
+
+[CONSTRAINTS]
+- Use formal logic symbols (e.g., $P \rightarrow Q$) where applicable.
+- Reference a classical school of thought (Stoicism, Rationalism, etc.) if it clarifies the logic.
+`;
+
+MEMORY CONTEXT:
+${Object.entries(memory).map(([k, v]) => `- ${k}: ${v}`).join('\n') || 'None'}
+
+${strictMode ? 'STRICT MODE: Use formal logic notation. Maximum precision.' : 'Standard mode: Balance rigor with readability.'}
+
+When users define concepts, offer to store them with explicit consent (format: REMEMBER: key: value).`;
+            };
+
+           const runAutoInference = async () => {
+    if (!input.trim() || loading) return;
+
+    const userText = input;
+    const systemPrompt = buildSystemPrompt();
+
+    // THE UPGRADE: We wrap the user prompt in a "Reasoning Framework"
+    const specializedPrompt = `
+    [PHASE 1: LOGIC SCRATCHPAD]
+    Decompose the user's request: "${userText}"
+    Identify premises and potential fallacies.
+    
+    [PHASE 2: FINAL OUTPUT]
+    Provide the rigorous response based on Phase 1. 
+    Use LaTeX for any formal logic.
+    `;
+
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', content: userText }]);
+    setLoading(true);
+
+    let success = false;
+    for (const modelId of modelSequence) {
+        setActiveModel(`Inference: ${modelId}`);
+        try {
+            const res = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        // This field is what gives the AI its "Brain" personality
+                        system_instruction: {
+                            parts: [{ text: systemPrompt }]
+                        },
+                        contents: [{
+                            parts: [{ text: userText }]
+                        }],
+                        generationConfig: {
+                            temperature: temperature,
+                            topP: 0.95,
+                        }
+                    })
+                }
+            );
+
+            const data = await res.json();
+
+            if (res.ok && data.candidates?.[0]?.content?.parts?.[0]) {
+                const reply = data.candidates[0].content.parts[0].text;
+                setMessages(prev => [...prev, { role: 'brain', content: reply, model: modelId }]);
+                setActiveModel(modelId);
+                success = true;
+                break;
             }
-            if (!success) setMessages(prev => [...prev, { role: 'brain', content: "CRITICAL_ERROR: SEQUENCE_INTERRUPTED" }]);
-            setLoading(false);
-            setActiveModel('Standby');
-        };
+        } catch (e) {
+            console.error(`${modelId} error:`, e);
+        }
+    }
 
-        const exportData = () => {
-            const data = { memory, messages, timestamp: new Date().toISOString() };
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `engine_dump_${Date.now()}.json`;
-            a.click();
-        };
+    if (!success) {
+        setMessages(prev => [...prev, { 
+            role: 'brain', 
+            content: "CRITICAL FAILURE: Logic engine disconnected. Ensure the Netlify _headers file allows connect-src to Google." 
+        }]);
+    }
+    setLoading(false);
+};
 
-        if (isLocked) return (
-            <div className="auth-gate flex flex-col items-center justify-center h-screen bg-black">
-                <h2 className="text-white font-bold tracking-[0.5em] mb-8">ENGINE_LOCKED</h2>
-                <input 
-                    type="password" 
-                    className="bg-transparent border-b border-gray-800 text-center text-white mb-8 outline-none focus:border-red-600 transition-colors"
-                    placeholder="API_KEY_REQUIRED"
-                    onKeyDown={(e) => e.key === 'Enter' && e.target.value && (localStorage.setItem('gemini_key', e.target.value), setApiKey(e.target.value), setIsLocked(false))}
-                />
-            </div>
-        );
 
-        return (
-            <div className="engine-frame flex flex-col h-screen bg-black text-gray-300 font-mono">
-                {/* Status Bar */}
-                <div className="p-4 border-b border-gray-900 flex justify-between items-center text-[10px]">
-                    <div className="flex gap-4">
-                        <span className={loading ? "text-red-500 animate-pulse" : "text-green-600"}>{loading ? 'EXECUTING' : 'IDLE'}</span>
-                        <span className="text-gray-600">{activeModel}</span>
+
+            const exportData = () => {
+                const data = { memory, messages, settings: { strictMode, temperature }, timestamp: new Date().toISOString() };
+                const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `brain_${Date.now()}.json`;
+                a.click();
+            };
+
+            const clearAll = () => {
+                if (confirm('Erase all memory and conversation?')) {
+                    setMessages([]);
+                    setMemory({});
+                    localStorage.removeItem('brain_messages');
+                    localStorage.removeItem('brain_memory');
+                }
+            };
+
+            const resetChat = () => {
+                if (confirm('Clear conversation history? (Memory will be preserved)')) {
+                    setMessages([]);
+                    localStorage.removeItem('brain_messages');
+                }
+            };
+
+            if (isLocked) {
+                return (
+                    <div className="auth-gate">
+                        <h2 className="text-white font-bold tracking-widest text-2xl mb-3">ACCESS RESTRICTED</h2>
+                        <p className="text-gray-500 text-[10px] mb-8 font-mono uppercase tracking-wider">Neural Bridge Authentication Required</p>
+                        <input 
+                            type="password" 
+                            placeholder="Enter Gemini API Key" 
+                            className="border-b border-gray-700 text-center text-gray-300 py-3 w-80 mb-8 text-sm"
+                            value={apiKey}
+                            onChange={(e) => setApiKey(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && apiKey.trim() && (localStorage.setItem('gemini_key', apiKey), setIsLocked(false))}
+                        />
+                        <br/>
+                        <button 
+                            onClick={() => { localStorage.setItem('gemini_key', apiKey); setIsLocked(false); }}
+                            disabled={!apiKey.trim()}
+                            className="border border-gray-600 px-10 py-3 text-xs text-gray-400 hover:border-red-600 hover:text-white transition-all uppercase font-bold tracking-wider"
+                        >
+                            Authorize
+                        </button>
+                        <p className="text-[10px] text-gray-700 mt-8">
+                            Get key: <span className="text-red-600">console.cloud.google.com/apis/credentials</span>
+                        </p>
                     </div>
-                    <div className="flex gap-4 cursor-pointer">
-                        <span onClick={() => setShowSettings(!showSettings)}><Settings /></span>
-                        <span onClick={exportData}><Download /></span>
-                        <span onClick={() => {setMessages([]); localStorage.removeItem('brain_messages')}}><Trash /></span>
-                    </div>
-                </div>
+                );
+            }
 
-                {/* Chat Area */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-8">
-                    {messages.map((m, i) => (
-                        <div key={i} className={`pl-6 border-l-2 ${m.role === 'user' ? 'border-gray-700' : 'border-red-600'}`}>
-                            <div className="flex items-center gap-3 mb-2">
-                                <span className={`text-[9px] font-black px-2 py-0.5 ${m.role === 'user' ? 'bg-gray-800' : 'bg-red-900/30 text-red-500'}`}>
-                                    {m.role === 'user' ? 'OPERATOR' : 'ENGINE.V2'}
-                                </span>
-                                {m.model && <span className="text-[8px] opacity-30">{m.model}</span>}
-                            </div>
-                            <div className="text-sm leading-relaxed">
-                                <MessageContent content={m.content} role={m.role} />
+            return (
+                <div className="engine-frame">
+                    <div className="status-bar">
+                        <div className="flex items-center gap-4">
+                            <span className="flex items-center">
+                                <span className="pulse-red"></span> 
+                                {loading ? 'PROCESSING' : 'READY'}
+                            </span>
+                            <span className="text-red-600">{activeModel}</span>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <span className="btn-icon" onClick={() => setShowSettings(!showSettings)} title="Settings">
+                                <Settings />
+                            </span>
+                            <span className="btn-icon" onClick={exportData} title="Export">
+                                <Download />
+                            </span>
+                            <span className="btn-icon hover:text-yellow-600" onClick={resetChat} title="Reset Chat">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polyline points="23 4 23 10 17 10"></polyline>
+                                    <polyline points="1 20 1 14 7 14"></polyline>
+                                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                                </svg>
+                            </span>
+                            <span className="btn-icon hover:text-red-600" onClick={clearAll} title="Clear All (Memory + Chat)">
+                                <Trash />
+                            </span>
+                            <span 
+                                className="btn-icon hover:text-blue-600" 
+                                onClick={() => {
+                                    const newKey = prompt('Enter new API key:', apiKey);
+                                    if (newKey && newKey.trim()) {
+                                        setApiKey(newKey.trim());
+                                        localStorage.setItem('gemini_key', newKey.trim());
+                                        alert('API key updated');
+                                    }
+                                }}
+                                title="Change API Key"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                                </svg>
+                            </span>
+                        </div>
+                    </div>
+
+                    {showSettings && (
+                        <div className="settings-panel">
+                            <div className="flex items-center gap-6 text-xs">
+                                <label className="flex items-center gap-2 text-gray-500">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={strictMode} 
+                                        onChange={(e) => setStrictMode(e.target.checked)} 
+                                        className="accent-red-600" 
+                                    />
+                                    STRICT MODE
+                                </label>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-gray-600">TEMP:</span>
+                                    <input 
+                                        type="range" 
+                                        min="0" 
+                                        max="1" 
+                                        step="0.1" 
+                                        value={temperature} 
+                                        onChange={(e) => setTemperature(parseFloat(e.target.value))} 
+                                        className="accent-red-600 w-32" 
+                                    />
+                                    <span className="text-red-600 w-8">{temperature}</span>
+                                </div>
+                                <div className="text-gray-700">
+                                    {messages.length} msgs • {Object.keys(memory).length} stored
+                                </div>
                             </div>
                         </div>
-                    ))}
-                    <div ref={scrollRef} />
-                </div>
+                    )}
 
-                {/* Input Bar */}
-                <div className="p-6 border-t border-gray-900 bg-[#050505]">
-                    <input 
-                        className="w-full bg-transparent border-b border-gray-800 py-2 outline-none focus:border-red-600 transition-colors text-sm"
-                        placeholder="INPUT_REASONING_PARAMETERS..."
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && runAutoInference()}
-                        disabled={loading}
-                    />
-                </div>
-            </div>
-        );
-    };
+                    {Object.keys(memory).length > 0 && (
+                        <div className="settings-panel border-t border-gray-900">
+                            <div className="text-[9px] text-red-600 uppercase tracking-wider mb-2">MEMORY</div>
+                            <div className="flex flex-wrap gap-2">
+                                {Object.entries(memory).map(([k, v]) => (
+                                    <div key={k} className="text-[10px] border border-gray-800 px-2 py-1 bg-black/30">
+                                        <span className="text-red-600">{k}:</span> <span className="text-gray-500">{v}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
-    ReactDOM.render(<App />, document.getElementById('root'));
-</script>
+                    <div className="chat-container">
+                        {messages.length === 0 && (
+                            <div className="h-full flex items-center justify-center opacity-20">
+                                <span className="text-xs tracking-[0.3em] text-gray-700">AWAITING_INPUT_SEQUENCE</span>
+                            </div>
+                        )}
+                        {messages.map((m, i) => (
+                            <div key={i} className={`message-block ${m.role === 'user' ? 'user-row' : 'brain-row'}`}>
+                                <div className="text-[9px] uppercase font-bold mb-2 opacity-50 flex justify-between tracking-wider">
+                                    <span>{m.role === 'user' ? 'OPERATOR' : 'ENGINE'}</span>
+                                    {m.model && <span className="text-red-600">{m.model}</span>}
+                                </div>
+                                <div className="text-sm leading-relaxed whitespace-pre-wrap text-gray-300">{m.content}</div>
+                            </div>
+                        ))}
+  <div key={i} className={`mb-8 border-l-2 ${m.role === 'user' ? 'border-gray-600 pl-4' : 'border-red-600 pl-6'}`}>
+    {/* Identity Header */}
+    <div className="flex items-center gap-3 mb-3">
+      <span className={`text-[10px] font-black tracking-[0.2em] px-2 py-0.5 ${m.role === 'user' ? 'bg-gray-800 text-gray-400' : 'bg-red-900/30 text-red-500'}`}>
+        {m.role === 'user' ? 'OPERATOR' : 'ENGINE.V2'}
+      </span>
+      {m.model && <span className="text-[9px] text-gray-700 font-mono tracking-tighter">{m.model}</span>}
+    </div>
+
+    {/* Message Body */}
+    <div className="text-sm leading-relaxed text-gray-300 font-mono">
+      {m.content.split('\n').map((line, idx) => {
+        // Highlight logic headers
+        if (line.startsWith('THESIS:') || line.startsWith('ANTITHESIS:') || line.startsWith('SYNTHESIS:')) {
+          return <p key={idx} className="text-red-600 font-bold mt-4 first:mt-0">{line}</p>;
+        }
+        return <p key={idx} className="mb-2">{line}</p>;
+      })}
+    </div>
+  </div>
+))}
+                        <div ref={scrollRef} />
+                    </div>
+
+                    <div className="p-5 bg-[#0f0f0f] border-t border-gray-900">
+                        <div className="flex gap-3">
+                            <input 
+                                className="flex-1 text-sm text-white py-2 border-b border-gray-800 focus:border-red-600 transition-colors"
+                                placeholder="Input reasoning parameters..."
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && runAutoInference()}
+                                disabled={loading}
+                            />
+                            <button 
+                                onClick={runAutoInference}
+                                className="text-[11px] font-bold text-gray-600 hover:text-red-600 transition-colors uppercase tracking-wider px-4"
+                                disabled={loading || !input.trim()}
+                            >
+                                {loading ? 'WAIT...' : 'EXECUTE'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+        const MessageContent = ({ content }) => {
+  // Regex to catch the Logic Scratchpad
+  const phaseMatch = content.match(/\[PHASE 1: LOGIC SCRATCHPAD\]([\s\S]*?)\[PHASE 2: FINAL OUTPUT\]([\s\S]*)/);
+
+  if (phaseMatch) {
+    const [_, scratchpad, finalOutput] = phaseMatch;
+    return (
+      <>
+        <details className="reasoning-container">
+          <summary className="reasoning-trigger">
+            <span>▼ View Logical Decomposition</span>
+          </summary>
+          <div className="reasoning-content">{scratchpad.trim()}</div>
+        </details>
+        <div className="final-output">
+          <MarkdownRenderer text={finalOutput.trim()} />
+        </div>
+      </>
+    );
+  }
+
+  return <MarkdownRenderer text={content} />;
+};
+    </script>
+</body>
+</html>oredMsgs));
+            }, []);
+
+            useEffect(() => {
+                if (messages.length > 0) {
+                    localStorage.setItem('brain_messages', JSON.stringify(messages));
+                }
+            }, [messages]);
+
+            const saveMemory = (newMemory) => {
+                setMemory(newMemory);
+                localStorage.setItem('brain_memory', JSON.stringify(newMemory));
+            };
+
+            const buildSystemPrompt = () => {
+                return `You are a strict reasoning assistant with these principles:
+
+1. EPISTEMIC HUMILITY: Say "unknown" when uncertain. Never fabricate.
+2. STEP-BY-STEP LOGIC: Decompose arguments into premises and conclusions.
+3. NO FLUFF: No motivational language or corporate jargon.
+4. CLASSICAL FOUNDATION: Reference Aristotle, Newton, Kant, Greek philosophy when relevant.
+const specializedPrompt = `
+[DIALECTIC PROTOCOL ACTIVATED]
+1. THESIS: Define the core proposition of "${userText}".
+2. ANTITHESIS: Identify the strongest counter-argument or potential logical fallacy.
+3. SYNTHESIS: Provide the most rigorous, fluff-free conclusion.
+
+[CONSTRAINTS]
+- Use formal logic symbols (e.g., $P \rightarrow Q$) where applicable.
+- Reference a classical school of thought (Stoicism, Rationalism, etc.) if it clarifies the logic.
+`;
+
+MEMORY CONTEXT:
+${Object.entries(memory).map(([k, v]) => `- ${k}: ${v}`).join('\n') || 'None'}
+@@ -485,64 +491,77 @@
+                            </div>
+                        )}
+                        {messages.map((m, i) => (
+                            <div key={i} className={`message-block ${m.role === 'user' ? 'user-row' : 'brain-row'}`}>
+                                <div className="text-[9px] uppercase font-bold mb-2 opacity-50 flex justify-between tracking-wider">
+                                    <span>{m.role === 'user' ? 'OPERATOR' : 'ENGINE'}</span>
+                                    {m.model && <span className="text-red-600">{m.model}</span>}
+                                </div>
+                                <div className="text-sm leading-relaxed whitespace-pre-wrap text-gray-300">{m.content}</div>
+                            </div>
+                        ))}
+  <div key={i} className={`mb-8 border-l-2 ${m.role === 'user' ? 'border-gray-600 pl-4' : 'border-red-600 pl-6'}`}>
+    {/* Identity Header */}
+    <div className="flex items-center gap-3 mb-3">
+      <span className={`text-[10px] font-black tracking-[0.2em] px-2 py-0.5 ${m.role === 'user' ? 'bg-gray-800 text-gray-400' : 'bg-red-900/30 text-red-500'}`}>
+        {m.role === 'user' ? 'OPERATOR' : 'ENGINE.V2'}
+      </span>
+      {m.model && <span className="text-[9px] text-gray-700 font-mono tracking-tighter">{m.model}</span>}
+    </div>
+
+    {/* Message Body */}
+    <div className="text-sm leading-relaxed text-gray-300 font-mono">
+      {m.content.split('\n').map((line, idx) => {
+        // Highlight logic headers
+        if (line.startsWith('THESIS:') || line.startsWith('ANTITHESIS:') || line.startsWith('SYNTHESIS:')) {
+          return <p key={idx} className="text-red-600 font-bold mt-4 first:mt-0">{line}</p>;
+        }
+        return <p key={idx} className="mb-2">{line}</p>;
+      })}
+    </div>
+  </div>
+))}
+                        <div ref={scrollRef} />
+                    </div>
+
+                    <div className="p-5 bg-[#0f0f0f] border-t border-gray-900">
+                        <div className="flex gap-3">
+                            <input 
+                                className="flex-1 text-sm text-white py-2 border-b border-gray-800 focus:border-red-600 transition-colors"
+                                placeholder="Input reasoning parameters..."
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && runAutoInference()}
+                                disabled={loading}
+                            />
+                            <button 
+                                onClick={runAutoInference}
+                                className="text-[11px] font-bold text-gray-600 hover:text-red-600 transition-colors uppercase tracking-wider px-4"
+                                disabled={loading || !input.trim()}
+                            >
+                                {loading ? 'WAIT...' : 'EXECUTE'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        ReactDOM.render(<App />, document.getElementById('root'));
+        const MessageContent = ({ content }) => {
+  // Regex to catch the Logic Scratchpad
+  const phaseMatch = content.match(/\[PHASE 1: LOGIC SCRATCHPAD\]([\s\S]*?)\[PHASE 2: FINAL OUTPUT\]([\s\S]*)/);
+
+  if (phaseMatch) {
+    const [_, scratchpad, finalOutput] = phaseMatch;
+    return (
+      <>
+        <details className="reasoning-container">
+          <summary className="reasoning-trigger">
+            <span>▼ View Logical Decomposition</span>
+          </summary>
+          <div className="reasoning-content">{scratchpad.trim()}</div>
+        </details>
+        <div className="final-output">
+          <MarkdownRenderer text={finalOutput.trim()} />
+        </div>
+      </>
+    );
+  }
+
+  return <MarkdownRenderer text={content} />;
+};
+    </script>
 </body>
 </html>
