@@ -281,36 +281,9 @@ When users define concepts, offer to store them with explicit consent (format: R
         }]);
     }
     setLoading(false);
-};;
+};
                         
-                        const data = await res.json();
-                        
-                        // Debug logging
-                        console.log(`${modelId} response:`, data);
-                        
-                        if (res.ok && data.candidates && data.candidates[0]) {
-                            const reply = data.candidates[0].content.parts[0].text;
-                            setMessages(prev => [...prev, { role: 'brain', content: reply, model: modelId }]);
-                            setActiveModel(modelId);
-                            success = true;
-                            break; // Exit loop on success
-                        } else {
-                            console.log(`${modelId} failed: ${data.error?.message || 'No candidates'}`);
-                        }
-                    } catch (e) {
-                        console.log(`${modelId} exception:`, e.message);
-                    }
-                }
-
-                if (!success) {
-                    setMessages(prev => [...prev, { 
-                        role: 'brain', 
-                        content: "CRITICAL: All model endpoints failed.\n\nCheck:\n1. API key valid at console.cloud.google.com/apis/credentials\n2. Gemini API enabled in your project\n3. Browser console for specific errors (F12)" 
-                    }]);
-                    setActiveModel("OFFLINE");
-                }
-                setLoading(false);
-            };
+                    
 
             const exportData = () => {
                 const data = { memory, messages, settings: { strictMode, temperature }, timestamp: new Date().toISOString() };
