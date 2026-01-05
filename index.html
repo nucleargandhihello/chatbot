@@ -10,6 +10,9 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 
     <style>
         body {
@@ -135,6 +138,39 @@
             opacity: 0.3;
             cursor: not-allowed;
         }
+        /* Reasoning Trace Styling */
+.reasoning-container {
+  background: #1a1a1a;
+  border-left: 3px solid #4a9eff;
+  margin: 10px 0;
+  border-radius: 4px;
+}
+
+.reasoning-trigger {
+  padding: 8px 12px;
+  cursor: pointer;
+  color: #4a9eff;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+}
+
+.reasoning-content {
+  padding: 12px;
+  color: #a0a0a0;
+  font-family: 'Courier New', monospace;
+  font-size: 0.85rem;
+  border-top: 1px solid #333;
+  white-space: pre-wrap;
+}
+
+/* Formal Logic Math Styling */
+.katex-display {
+  margin: 1em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
     </style>
 </head>
 <body>
@@ -225,12 +261,23 @@ ${strictMode ? 'STRICT MODE: Use formal logic notation. Maximum precision.' : 'S
 When users define concepts, offer to store them with explicit consent (format: REMEMBER: key: value).`;
             };
 
-            const runAutoInference = async () => {
+           const runAutoInference = async () => {
     if (!input.trim() || loading) return;
     
     const userText = input;
-    const systemPrompt = buildSystemPrompt(); // Retrieve your strict logic rules
+    const systemPrompt = buildSystemPrompt();
     
+    // THE UPGRADE: We wrap the user prompt in a "Reasoning Framework"
+    const specializedPrompt = `
+    [PHASE 1: LOGIC SCRATCHPAD]
+    Decompose the user's request: "${userText}"
+    Identify premises and potential fallacies.
+    
+    [PHASE 2: FINAL OUTPUT]
+    Provide the rigorous response based on Phase 1. 
+    Use LaTeX for any formal logic.
+    `;
+
     setInput('');
     setMessages(prev => [...prev, { role: 'user', content: userText }]);
     setLoading(true);
@@ -473,6 +520,29 @@ When users define concepts, offer to store them with explicit consent (format: R
         };
 
         ReactDOM.render(<App />, document.getElementById('root'));
+        const MessageContent = ({ content }) => {
+  // Regex to catch the Logic Scratchpad
+  const phaseMatch = content.match(/\[PHASE 1: LOGIC SCRATCHPAD\]([\s\S]*?)\[PHASE 2: FINAL OUTPUT\]([\s\S]*)/);
+
+  if (phaseMatch) {
+    const [_, scratchpad, finalOutput] = phaseMatch;
+    return (
+      <>
+        <details className="reasoning-container">
+          <summary className="reasoning-trigger">
+            <span>▼ View Logical Decomposition</span>
+          </summary>
+          <div className="reasoning-content">{scratchpad.trim()}</div>
+        </details>
+        <div className="final-output">
+          <MarkdownRenderer text={finalOutput.trim()} />
+        </div>
+      </>
+    );
+  }
+
+  return <MarkdownRenderer text={content} />;
+};
     </script>
 </body>
 </html>
