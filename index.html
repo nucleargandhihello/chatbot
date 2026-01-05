@@ -226,30 +226,62 @@ When users define concepts, offer to store them with explicit consent (format: R
             };
 
             const runAutoInference = async () => {
-                if (!input.trim() || loading) return;
-                
-                const userText = input;
-                setInput('');
-                setMessages(prev => [...prev, { role: 'user', content: userText }]);
-                setLoading(true);
+    if (!input.trim() || loading) return;
+    
+    const userText = input;
+    const systemPrompt = buildSystemPrompt(); // Retrieve your strict logic rules
+    
+    setInput('');
+    setMessages(prev => [...prev, { role: 'user', content: userText }]);
+    setLoading(true);
 
-                // Fallback Logic Loop
-                let success = false;
-                for (const modelId of modelSequence) {
-                    setActiveModel(`Testing: ${modelId}`);
-                    try {
-                        const res = await fetch(
-                            `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
-                            {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({
-                                    contents: [{
-                                        parts: [{ text: userText }]
-                                    }]
-                                })
-                            }
-                        );
+    let success = false;
+    for (const modelId of modelSequence) {
+        setActiveModel(`Inference: ${modelId}`);
+        try {
+            const res = await fetch(
+                `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent?key=${apiKey}`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        // This field is what gives the AI its "Brain" personality
+                        system_instruction: {
+                            parts: [{ text: systemPrompt }]
+                        },
+                        contents: [{
+                            parts: [{ text: userText }]
+                        }],
+                        generationConfig: {
+                            temperature: temperature,
+                            topP: 0.95,
+                        }
+                    })
+                }
+            );
+            
+            const data = await res.json();
+            
+            if (res.ok && data.candidates?.[0]?.content?.parts?.[0]) {
+                const reply = data.candidates[0].content.parts[0].text;
+                setMessages(prev => [...prev, { role: 'brain', content: reply, model: modelId }]);
+                setActiveModel(modelId);
+                success = true;
+                break;
+            }
+        } catch (e) {
+            console.error(`${modelId} error:`, e);
+        }
+    }
+
+    if (!success) {
+        setMessages(prev => [...prev, { 
+            role: 'brain', 
+            content: "CRITICAL FAILURE: Logic engine disconnected. Ensure the Netlify _headers file allows connect-src to Google." 
+        }]);
+    }
+    setLoading(false);
+};;
                         
                         const data = await res.json();
                         
