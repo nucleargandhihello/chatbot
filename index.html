@@ -248,10 +248,16 @@
             const buildSystemPrompt = () => {
                 return `You are a strict reasoning assistant with these principles:
 
-1. EPISTEMIC HUMILITY: Say "unknown" when uncertain. Never fabricate.
-2. STEP-BY-STEP LOGIC: Decompose arguments into premises and conclusions.
-3. NO FLUFF: No motivational language or corporate jargon.
-4. CLASSICAL FOUNDATION: Reference Aristotle, Newton, Kant, Greek philosophy when relevant.
+const specializedPrompt = `
+[DIALECTIC PROTOCOL ACTIVATED]
+1. THESIS: Define the core proposition of "${userText}".
+2. ANTITHESIS: Identify the strongest counter-argument or potential logical fallacy.
+3. SYNTHESIS: Provide the most rigorous, fluff-free conclusion.
+
+[CONSTRAINTS]
+- Use formal logic symbols (e.g., $P \rightarrow Q$) where applicable.
+- Reference a classical school of thought (Stoicism, Rationalism, etc.) if it clarifies the logic.
+`;
 
 MEMORY CONTEXT:
 ${Object.entries(memory).map(([k, v]) => `- ${k}: ${v}`).join('\n') || 'None'}
@@ -485,14 +491,27 @@ When users define concepts, offer to store them with explicit consent (format: R
                             </div>
                         )}
                         {messages.map((m, i) => (
-                            <div key={i} className={`message-block ${m.role === 'user' ? 'user-row' : 'brain-row'}`}>
-                                <div className="text-[9px] uppercase font-bold mb-2 opacity-50 flex justify-between tracking-wider">
-                                    <span>{m.role === 'user' ? 'OPERATOR' : 'ENGINE'}</span>
-                                    {m.model && <span className="text-red-600">{m.model}</span>}
-                                </div>
-                                <div className="text-sm leading-relaxed whitespace-pre-wrap text-gray-300">{m.content}</div>
-                            </div>
-                        ))}
+  <div key={i} className={`mb-8 border-l-2 ${m.role === 'user' ? 'border-gray-600 pl-4' : 'border-red-600 pl-6'}`}>
+    {/* Identity Header */}
+    <div className="flex items-center gap-3 mb-3">
+      <span className={`text-[10px] font-black tracking-[0.2em] px-2 py-0.5 ${m.role === 'user' ? 'bg-gray-800 text-gray-400' : 'bg-red-900/30 text-red-500'}`}>
+        {m.role === 'user' ? 'OPERATOR' : 'ENGINE.V2'}
+      </span>
+      {m.model && <span className="text-[9px] text-gray-700 font-mono tracking-tighter">{m.model}</span>}
+    </div>
+
+    {/* Message Body */}
+    <div className="text-sm leading-relaxed text-gray-300 font-mono">
+      {m.content.split('\n').map((line, idx) => {
+        // Highlight logic headers
+        if (line.startsWith('THESIS:') || line.startsWith('ANTITHESIS:') || line.startsWith('SYNTHESIS:')) {
+          return <p key={idx} className="text-red-600 font-bold mt-4 first:mt-0">{line}</p>;
+        }
+        return <p key={idx} className="mb-2">{line}</p>;
+      })}
+    </div>
+  </div>
+))}
                         <div ref={scrollRef} />
                     </div>
 
